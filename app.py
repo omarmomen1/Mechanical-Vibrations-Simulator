@@ -91,14 +91,19 @@ st.markdown("""
 # 2. HARDWARE CONTROL MATRIX (TOP)
 # ==========================================
 st.markdown("### SYSTEM PARAMETERS")
-ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns(5)
+ctrl1, ctrl2, ctrl3 = st.columns(3)
 
-with ctrl1: m = st.number_input("Mass (kg)", min_value=0.1, value=10.0, step=0.5)
-with ctrl2: k = st.number_input("Stiffness (N/m)", min_value=1.0, value=4000.0, step=100.0)
-with ctrl3: c = st.number_input("Damping (Ns/m)", min_value=0.0, value=20.0, step=5.0)
-with ctrl4: F0 = st.number_input("Force Amplitude (N)", min_value=0.0, value=100.0, step=10.0)
-with ctrl5: omega = st.number_input("Force Freq (rad/s)", min_value=0.0, value=20.0, step=1.0)
+with ctrl1: m = st.number_input("Mass (kg)", min_value=0.1, value=12.0, step=0.5)
+with ctrl2: k = st.number_input("Stiffness (N/m)", min_value=1.0, value=10.0, step=1.0)
+with ctrl3: c = st.number_input("Damping (Ns/m)", min_value=0.0, value=0.5, step=0.1)
 
+st.markdown("### EXCITATION & INITIAL CONDITIONS")
+exc1, exc2, exc3, exc4 = st.columns(4)
+
+with exc1: F0 = st.number_input("Force Amplitude (N)", min_value=0.0, value=0.0, step=5.0)
+with exc2: omega = st.number_input("Force Freq (rad/s)", min_value=0.0, value=20.0, step=1.0)
+with exc3: x0 = st.number_input("Initial Disp. (m)", value=0.5, step=0.1)
+with exc4: v0 = st.number_input("Initial Vel. (m/s)", value=0.0, step=0.1)
 # ==========================================
 # 3. MATHEMATICAL DIAGNOSTICS (TELEMETRY)
 # ==========================================
@@ -128,7 +133,6 @@ st.markdown("<br>", unsafe_allow_html=True)
 # 4. CUSTOM RK4 PHYSICS ENGINE (NUMERICAL SOLVER)
 # ==========================================
 # Initial conditions
-x0, v0 = 0.0, 0.0
 t_max = 10.0
 dt = 0.005
 n_steps = int(t_max / dt)
@@ -189,20 +193,29 @@ with tab2:
 
 with tab3:
     st.markdown("### 🔊 Structural Acoustic Signature")
-    st.markdown("This tool converts the calculated mechanical vibration waveform directly into an audible pulse. High stiffness ($k > 50000$) will produce higher pitches.")
+    st.markdown("This tool converts the calculated mechanical vibration waveform directly into an audible pulse.")
     
     # 1. Generate high-res waveform for audio (2 seconds at 44.1kHz)
     sample_rate = 44100
     duration = 2.0
     t_audio = np.linspace(0, duration, int(sample_rate * duration))
     
-    # Fast analytical decay generation for the sound effect
-    audio_wave = np.exp(-zeta * omega_n * t_audio) * np.sin(omega_d * t_audio)
+    # 2. Dynamic Audio Generation based on System Regime
+    if zeta < 1:
+        # Underdamped: Rings out naturally like a bell
+        audio_wave = np.exp(-zeta * omega_n * t_audio) * np.sin(omega_d * t_audio)
+    else:
+        # Critically/Overdamped: Doesn't ring. Just a dull thud.
+        # BUT if there is a forcing frequency, we hear the hum of the motor.
+        if F0 > 0:
+            audio_wave = np.sin(omega * t_audio)
+        else:
+            audio_wave = np.exp(-omega_n * t_audio) # A fast, dull thud
     
     # Normalize to 16-bit integer for standard WAV audio
     audio_norm = np.int16((audio_wave / np.max(np.abs(audio_wave) + 1e-9)) * 32767)
     
-    # 2. Encode to raw WAV bytes in memory
+    # 3. Encode to raw WAV bytes in memory
     audio_buffer = io.BytesIO()
     with wave.open(audio_buffer, 'wb') as wav_file:
         wav_file.setnchannels(1) # Mono
@@ -210,7 +223,7 @@ with tab3:
         wav_file.setframerate(sample_rate)
         wav_file.writeframes(audio_norm.tobytes())
     
-    # 3. Output to Streamlit audio player
+    # 4. Output to Streamlit audio player
     st.audio(audio_buffer.getvalue(), format="audio/wav")
     
     st.success("✅ Waveform Synthesized. Press Play to hear the structural response.")

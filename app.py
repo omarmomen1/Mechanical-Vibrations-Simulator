@@ -2,7 +2,6 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 import wave
-import struct
 import io
 
 # ==========================================
@@ -13,70 +12,32 @@ st.set_page_config(page_title="VibraLab R&D", page_icon="🎛️", layout="wide"
 st.markdown("""
 <style>
     /* R&D Lab Instrument Background */
-    .stApp {
-        background-color: #121212;
-        color: #e0e0e0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
+    .stApp { background-color: #121212; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, sans-serif; }
     
     /* Hardware Control Knobs (Inputs) */
     div[data-baseweb="input"] > div {
-        background-color: #1e1e1e !important;
-        border: 2px solid #333333 !important;
-        border-radius: 2px !important;
-        border-bottom: 2px solid #00ff41 !important; /* Oscilloscope Green Accent */
+        background-color: #1e1e1e !important; border: 2px solid #333333 !important;
+        border-radius: 2px !important; border-bottom: 2px solid #00ff41 !important; 
     }
-    
-    /* Monospace for all numeric data */
-    input[type="number"], .stMarkdown p {
-        font-family: 'Consolas', 'Courier New', monospace !important;
-        color: #ffffff !important;
-    }
+    input[type="number"], .stMarkdown p { font-family: 'Consolas', 'Courier New', monospace !important; color: #ffffff !important; }
     
     /* Instrument Header */
     .lab-header {
-        background-color: #1a1a1a;
-        padding: 15px 20px;
-        border: 1px solid #333;
-        border-left: 5px solid #00ff41;
-        margin-bottom: 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        background-color: #1a1a1a; padding: 15px 20px; border: 1px solid #333;
+        border-left: 5px solid #00ff41; margin-bottom: 20px; display: flex;
+        justify-content: space-between; align-items: center;
     }
-    .lab-header h1 {
-        color: #e0e0e0;
-        margin: 0;
-        font-size: 1.8rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-    }
-    .status-light {
-        color: #00ff41;
-        font-weight: bold;
-        animation: blink 2s infinite;
-    }
+    .lab-header h1 { color: #e0e0e0; margin: 0; font-size: 1.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; }
+    .status-light { color: #00ff41; font-weight: bold; animation: blink 2s infinite; }
     @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.4;} 100% {opacity: 1;} }
 
     /* Telemetry Panels */
-    .telemetry-box {
-        background-color: #0a0a0a;
-        border: 1px solid #333;
-        padding: 15px;
-        text-align: center;
-    }
-    .telemetry-val {
-        color: #00ff41;
-        font-size: 2rem;
-        font-weight: bold;
-    }
-    .telemetry-lbl {
-        color: #888;
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
+    .telemetry-box { background-color: #0a0a0a; border: 1px solid #333; padding: 15px; text-align: center; }
+    .telemetry-val { color: #00ff41; font-size: 2rem; font-weight: bold; }
+    .telemetry-lbl { color: #888; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+    
+    /* Hide Default Elements */
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -93,9 +54,10 @@ st.markdown("""
 st.markdown("### SYSTEM PARAMETERS")
 ctrl1, ctrl2, ctrl3 = st.columns(3)
 
-with ctrl1: m = st.number_input("Mass (kg)", min_value=0.1, value=12.0, step=0.5)
-with ctrl2: k = st.number_input("Stiffness (N/m)", min_value=1.0, value=10.0, step=1.0)
-with ctrl3: c = st.number_input("Damping (Ns/m)", min_value=0.0, value=0.5, step=0.1)
+# Restored the classic "tight spring" default parameters
+with ctrl1: m = st.number_input("Mass (kg)", min_value=0.1, value=1.0, step=0.5)
+with ctrl2: k = st.number_input("Stiffness (N/m)", min_value=1.0, value=250.0, step=10.0)
+with ctrl3: c = st.number_input("Damping (Ns/m)", min_value=0.0, value=1.5, step=0.1)
 
 st.markdown("### EXCITATION & INITIAL CONDITIONS")
 exc1, exc2, exc3, exc4 = st.columns(4)
@@ -104,6 +66,7 @@ with exc1: F0 = st.number_input("Force Amplitude (N)", min_value=0.0, value=0.0,
 with exc2: omega = st.number_input("Force Freq (rad/s)", min_value=0.0, value=20.0, step=1.0)
 with exc3: x0 = st.number_input("Initial Disp. (m)", value=0.5, step=0.1)
 with exc4: v0 = st.number_input("Initial Vel. (m/s)", value=0.0, step=0.1)
+
 # ==========================================
 # 3. MATHEMATICAL DIAGNOSTICS (TELEMETRY)
 # ==========================================
@@ -132,7 +95,6 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ==========================================
 # 4. CUSTOM RK4 PHYSICS ENGINE (NUMERICAL SOLVER)
 # ==========================================
-# Initial conditions
 t_max = 10.0
 dt = 0.005
 n_steps = int(t_max / dt)
@@ -141,9 +103,9 @@ t_arr = np.linspace(0, t_max, n_steps)
 x_arr = np.zeros(n_steps)
 v_arr = np.zeros(n_steps)
 
+# Uses the live Initial Conditions from the control panel
 x_arr[0], v_arr[0] = x0, v0
 
-# Fast pure-NumPy 4th Order Runge-Kutta Integrator
 for i in range(1, n_steps):
     t = t_arr[i-1]
     x, v = x_arr[i-1], v_arr[i-1]
@@ -166,7 +128,6 @@ for i in range(1, n_steps):
 # ==========================================
 tab1, tab2, tab3 = st.tabs(["📺 Time Oscilloscope", "🌀 Phase Space Orbit", "🔊 Acoustic Synthesizer"])
 
-# Helper function for oscilloscope styling
 def apply_scope_style(fig):
     fig.update_layout(
         plot_bgcolor='#0a0a0a', paper_bgcolor='#121212',
@@ -193,37 +154,35 @@ with tab2:
 
 with tab3:
     st.markdown("### 🔊 Structural Acoustic Signature")
-    st.markdown("This tool converts the calculated mechanical vibration waveform directly into an audible pulse.")
+    st.markdown("Translates the physical vibration profile into an audible acoustic wave using carrier pitch-shifting.")
     
-    # 1. Generate high-res waveform for audio (2 seconds at 44.1kHz)
     sample_rate = 44100
     duration = 2.0
     t_audio = np.linspace(0, duration, int(sample_rate * duration))
     
-    # 2. Dynamic Audio Generation based on System Regime
-    if zeta < 1:
-        # Underdamped: Rings out naturally like a bell
-        audio_wave = np.exp(-zeta * omega_n * t_audio) * np.sin(omega_d * t_audio)
-    else:
-        # Critically/Overdamped: Doesn't ring. Just a dull thud.
-        # BUT if there is a forcing frequency, we hear the hum of the motor.
-        if F0 > 0:
-            audio_wave = np.sin(omega * t_audio)
-        else:
-            audio_wave = np.exp(-omega_n * t_audio) # A fast, dull thud
+    # Pitch Shifter: Scales structural frequency into human hearing range (>200Hz)
+    pitch_multiplier = max(10.0, 300.0 / max(freq_hz, 0.1))
+    audible_omega_d = omega_d * pitch_multiplier
+    audible_omega = omega * pitch_multiplier
     
-    # Normalize to 16-bit integer for standard WAV audio
+    if zeta < 1:
+        # Underdamped: Clean ring with exact physical decay envelope
+        audio_wave = np.exp(-zeta * omega_n * t_audio) * np.sin(audible_omega_d * t_audio)
+    else:
+        # Overdamped
+        if F0 > 0:
+            audio_wave = np.sin(audible_omega * t_audio) # Motor hum
+        else:
+            audio_wave = np.exp(-omega_n * t_audio) * np.sin(440 * 2 * np.pi * t_audio) # Synthetic thud
+            
+    # Normalize to 16-bit PCM
     audio_norm = np.int16((audio_wave / np.max(np.abs(audio_wave) + 1e-9)) * 32767)
     
-    # 3. Encode to raw WAV bytes in memory
     audio_buffer = io.BytesIO()
     with wave.open(audio_buffer, 'wb') as wav_file:
-        wav_file.setnchannels(1) # Mono
-        wav_file.setsampwidth(2) # 16-bit
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
         wav_file.setframerate(sample_rate)
         wav_file.writeframes(audio_norm.tobytes())
     
-    # 4. Output to Streamlit audio player
     st.audio(audio_buffer.getvalue(), format="audio/wav")
-    
-    st.success("✅ Waveform Synthesized. Press Play to hear the structural response.")
